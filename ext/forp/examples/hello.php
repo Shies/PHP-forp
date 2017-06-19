@@ -1,10 +1,19 @@
 <?php
+// first thing to do, enable forp profiler
+forp_start();
 
-class Foo {
-  public $foo = 'foo';
-	public $bar = 'bar';
-}
+// here, our PHP code we want to profile
+function foo()
+{
+    echo "Hello world !\n";
+};
 
-$var = array("one" => "my", "strkey" => "inspected", "three" => new Foo());
-forp_inspect('var', $var);
-print_r(forp_dump());
+foo();
+
+// stop forp buffering
+forp_end();
+
+// get the stack as an array
+$profileStack = forp_dump();
+
+print_r($profileStack);

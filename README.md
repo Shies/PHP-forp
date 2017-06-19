@@ -3,6 +3,8 @@
 forp is a lightweight PHP extension which provides PHP profile datas.
 
 Summary of features :
+- PHP7编译时要使用(--enable-dtrace)
+- PHP7使用时需要设置环境变量(export USE_ZEND_DTRACE=1)
 - measurement of time and allocated memory for each function
 - CPU usage
 - file and line number of the function call
@@ -10,6 +12,7 @@ Summary of features :
 - caption of functions
 - grouping of functions
 - aliases of functions (useful for anonymous functions)
+
 
 forp is non intrusive, it provides PHP annotations to do its work.
 
@@ -333,25 +336,6 @@ function render($datas) {
 }
 ```
 
-# Demos / UI #
-
-forp provides a structure so simple that it's easy to make your own UI.
-
-But, if you are looking for a user interface with a lot of features, we've made a rich JavaScript client :
-[forp-ui](https://github.com/aterrien/forp-ui/)
-
-You can see forp in action with the fastest PHP Frameworks :
-- [Beaba](http://forp.io/beaba/hello) (https://github.com/ichiriac/beaba-light)
-- [Slim](http://forp.io/slim/hello) (https://github.com/codeguy/Slim)
-- [Silex](http://forp.io/silex/hello) (https://github.com/fabpot/Silex)
-- [Laravel](http://forp.io/laravel/hello) (https://github.com/laravel/laravel)
-
-![groups](https://raw.github.com/aterrien/forp-ui/master/doc/ui-consolas-groups.png)
-
-# Build status #
-
-[![Build Status](https://secure.travis-ci.org/aterrien/forp-PHP-profiler.png)](http://travis-ci.org/aterrien/forp-PHP-profiler)
-
 # Installation, requirements #
 
 ## Requirements ##
@@ -364,16 +348,16 @@ apt-get install php5-dev
 
 ## Install with Composer ##
 
-Require forp-PHP-profiler in your project composer.json
+Require PHP7-forp in your project composer.json
 
 ```json
 "require-dev":       {
-  "aterrien/forp-profiler" : "~1.1"
+  "gukai/php7-forp" : "dev-master"
 },
 "repositories" : [
   {
      "type" : "git",
-     "url"  : "git@github.com:aterrien/forp-PHP-profiler.git"
+     "url"  : "git@github.com:Shies/PHP7-forp.git"
   }
 ]
 ```
@@ -383,7 +367,8 @@ php composer.phar install
 ```
 compile
 ```sh
-cd vendor/aterrien/forp-profiler/ext/forp
+cd vendor/Shies/PHP7-forp/ext/forp
+export USE_ZEND_DTRACE=1
 phpize
 ./configure
 make && make install
@@ -394,19 +379,15 @@ extension=forp.so
 ```
 ## or opt for "old school" installation ##
 
-Use current release
-```sh
-wget https://github.com/aterrien/forp/archive/1.1.0.tar.gz
-tar -xvzf 1.1.0.tar.gz
-cd 1.1.0/ext/forp
 ```
 OR dev-master (unstable, at your own risk)
 ```sh
-git clone https://github.com/aterrien/forp-PHP-profiler
-cd forp-PHP-profiler/ext/forp
+git clone https://github.com/Shies/PHP7-forp
+cd PHP7-forp/ext/forp
 ```
 compile
 ```sh
+export USE_ZEND_DTRACE=1
 phpize
 ./configure
 make && make install
@@ -439,13 +420,22 @@ Apache/2.2.15 (Unix)
 
 PHP 5.4.13 (cli) (built: Mar 15 2013 11:27:51)
 
-### MacOS(___Shies) ###
+### MacOS ###
 
 MacOS Sierra/10.12.3 (unix)
 
 Nginx/1.12.0         (web)
 
-PHP 5.6.30           (cli) (built: Mar 15 2017 19:52:30)
+PHP 5.6.30           (cli) (built: May 10 2017 19:52:30)
+
+### MacOS ###
+
+MacOS Sierra/10.12.3 (unix)
+
+Nginx/1.12.0         (web)
+
+PHP 7.0.7            (cli) (built: May 17 2017 19:52:30)
+
 
 # Contributors #
 

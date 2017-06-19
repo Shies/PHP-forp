@@ -81,27 +81,7 @@ typedef struct forp_node_t {
 } forp_node_t;
 
 
-/* Zend API proxies */
-#if PHP_VERSION_ID < 50500
-static void (*old_execute)(zend_op_array *op_array TSRMLS_DC);
-static void forp_execute(zend_op_array *op_array TSRMLS_DC);
-static void (*old_execute_internal)(zend_execute_data *current_execute_data, int return_value_used TSRMLS_DC);
-static void forp_execute_internal(zend_execute_data *current_execute_data, int return_value_used TSRMLS_DC);
-#else
-static void (*old_execute_ex)(zend_execute_data *execute_data);
-static void forp_execute_ex(zend_execute_data *execute_data);
-static void (*old_execute_internal)(zend_execute_data *execute_data, zval *return_value);
-static void forp_execute_internal(zend_execute_data *execute_data, zval *return_value);
-#endif
-
-
 static void forp_populate_function(forp_function_t *function, zend_execute_data *edata, zend_op_array *op_array TSRMLS_DC);
-
-void forp_info(TSRMLS_D);
-
-void forp_start(TSRMLS_D);
-
-void forp_end(TSRMLS_D);
 
 forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TSRMLS_DC);
 

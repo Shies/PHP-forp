@@ -67,3 +67,8 @@ if test "$PHP_FORP" != "no"; then
   forp_log.c \
   forp_json.c, $ext_shared)
 fi
+
+AC_ARG_ENABLE(debug,
+[  --enable-debug     Enable yaf debug mode default=no],
+[PHP_DEBUG=$enableval],
+[PHP_DEBUG="no"])

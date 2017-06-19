@@ -31,6 +31,7 @@
 #include "forp_string.h"
 #include "forp_annotation.h"
 #include "ext/standard/php_var.h"
+#include "Zend/zend_vm.h"
 
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -42,9 +43,6 @@ static inline double round(double val) {
 }
 #endif
 
-#if HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif
 
 /* {{{ forp_populate_function
  */
@@ -60,7 +58,7 @@ static void forp_populate_function(
     function->filename = NULL;
 
     // Retrieves class and function names
-    if (edata->func->common.function_name) {
+    if (edata->func && edata->func->common.function_name) {
         if (Z_OBJ(edata->This)) {
             if (edata->func->common.scope) {
                 function->class = strdup(ZSTR_VAL(edata->func->common.scope->name));
@@ -74,6 +72,9 @@ static void forp_populate_function(
         }
 
         function->function = strdup(ZSTR_VAL(edata->func->common.function_name));
+    } else if (op_array && op_array->function_name) {
+        // get this filename
+        function->function = strdup(ZSTR_VAL(op_array->function_name));
     } else {
 #if PHP_VERSION_ID >= 50399
         switch (function->type = edata->opline->extended_value) {
@@ -102,17 +103,115 @@ static void forp_populate_function(
     }
 
     // Stores filename
-    if (op_array && op_array->filename) {
+    if (edata->func && ZEND_USER_CODE(edata->func->common.type)) {
+        op_array = &(edata->func->op_array);
+    } else if (edata->prev_execute_data && edata->prev_execute_data->func &&
+         ZEND_USER_CODE(edata->prev_execute_data->func->common.type)) {
+        op_array = &(edata->prev_execute_data->func->op_array); /* try using prev */
+    }
+
+    if (op_array) {
         function->filename = strdup(ZSTR_VAL(op_array->filename));
     } else {
-        if (op_array && op_array->filename) {
-            function->filename = strdup(ZSTR_VAL(op_array->filename));
-        } else {
-            function->filename = NULL;
-        }
+        function->filename = NULL;
     }
 }
 /* }}} */
+
+
+char *getArgumentStack(zend_execute_data *edata, forp_node_t *n)
+{
+#if PHP_VERSION_ID >= 50500
+    if (ZEND_CALL_NUM_ARGS(edata) > 0) {
+        char c[4];
+        zval *arg;
+        const char *nums = "123456789";
+        char *result = NULL;
+        char delims[] = "#";
+        char *to;
+        char *val;
+        result = strtok( strdup(n->caption), delims );
+        while( result != NULL ) {
+            if (strchr(nums, result[0])) {
+                to = strndup(result, 1);
+                arg = ZEND_CALL_ARG(edata, (edata->func->op_array).num_args);
+                sprintf(c, "#%d", atoi(to));
+                switch(Z_TYPE_P(arg)) {
+                    case IS_DOUBLE: case IS_LONG: case IS_TRUE:
+                    case IS_FALSE: case IS_NULL: case IS_STRING:
+                        convert_to_string(arg);
+                        val = Z_STRVAL_P(arg);
+                        break;
+                    case IS_RESOURCE:
+                        val = "Resource";
+                        break;
+                    case IS_OBJECT:
+                        val = "Object";
+                        break;
+                    case IS_ARRAY:
+                        val = "Array";
+                        break;
+                    default:
+                        val = "";
+                }
+                n->caption = forp_str_replace(
+                    c, val,
+                    n->caption TSRMLS_CC
+                );
+            }
+            result = strtok( NULL, delims );
+        }
+    }
+#else
+    void **params;
+    int params_count;
+    int i;
+
+    // Retrieves params in zend_vm_stack
+#if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION > 2)
+    params = EG(argument_stack)->top-1;
+#else
+    params = EG(argument_stack).top_element-1;
+#endif
+
+    params_count = (ulong) *params;
+    for(i = 1; i <= params_count; i++) {
+        char c[4];
+        char *v, *v_copy;
+        zval *expr;
+        zval expr_copy;
+        int use_copy;
+
+        sprintf(c, "#%d", params_count - i + 1);
+        expr = *((zval **) (params - i));
+
+        if(Z_TYPE_P(expr) == IS_OBJECT) {
+            // Object or Closure
+            // Closure throws a Recoverable Fatal in zend_make_printable_zval
+            v_copy = malloc(sizeof(char*) * (strlen(Z_OBJCE_P(expr)->name) + 2));
+            sprintf(v_copy, "(%s)", Z_OBJCE_P(expr)->name);
+            v = strdup(v_copy);
+            free(v_copy);
+        } else {
+            // Uses zend_make_printable_zval
+            zend_make_printable_zval(expr, &expr_copy, &use_copy);
+            if(use_copy) {
+                v = strdup((char*)(expr_copy).value.str.val);
+                zval_dtor(&expr_copy);
+            } else {
+                v = strdup((char*)(*expr).value.str.val);
+            }
+        }
+        n->caption = forp_str_replace(
+            c, v,
+            n->caption TSRMLS_CC
+        );
+    }
+#endif
+
+    return n->caption;
+}
+
 
 /* {{{ forp_open_node
  */
@@ -125,12 +224,12 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
     // preparing current node
     // will be profiled after
     // forp_is_profiling_function test
-    n = malloc(sizeof (forp_node_t));
+    n = malloc(sizeof(forp_node_t));
 
     // getting function infos
-    if(edata) {
+    if (edata) {
         forp_populate_function(&(n->function), edata, op_array TSRMLS_CC);
-        if(forp_is_profiling_function(n TSRMLS_CC)) {
+        if (forp_is_profiling_function(n TSRMLS_CC)) {
             free(n);
             return NULL;
         }
@@ -139,11 +238,6 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
     // self duration on open
     gettimeofday(&tv, NULL);
     start_time = tv.tv_sec * 1000000.0 + tv.tv_usec;
-
-    // continues node init
-    n->state = 1; // opened
-    n->level = FORP_G(nesting_level)++;
-    n->parent = FORP_G(current_node);
 
     n->time_begin = 0;
     n->time_end = 0;
@@ -158,6 +252,11 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
     // Call file and line number
     n->filename = NULL;
     n->lineno = 0;
+
+    // continues node init
+    n->state = 1; // opened
+    n->level = FORP_G(nesting_level)++;
+    n->parent = FORP_G(current_node);
 
     // Annotations
     n->alias = NULL;
@@ -185,110 +284,46 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
         }
     }
 
-    if(edata) {
+    if (edata) {
 
         // Retrieves filename
         if(FORP_G(current_node) && FORP_G(current_node)->function.filename) {
             n->filename = strdup(FORP_G(current_node)->function.filename);
         }
 
+#if PHP_VERSION_ID >= 70000
+        /* FIXME Sometimes execute_data->opline can be a interger NOT pointer.
+         * I dont know how to handle it, this just make it works. */
+        if (edata && edata->opline && edata->prev_execute_data &&
+                edata->func && edata->func->op_array.opcodes == NULL) {
+            edata = edata->prev_execute_data;
+        }
+
+        /* skip internal handler */
+        if (edata && edata->opline && edata->prev_execute_data &&
+                edata->opline->opcode != ZEND_DO_FCALL &&
+                edata->opline->opcode != ZEND_DO_ICALL &&
+                edata->opline->opcode != ZEND_DO_UCALL &&
+                edata->opline->opcode != ZEND_DO_FCALL_BY_NAME &&
+                edata->opline->opcode != ZEND_INCLUDE_OR_EVAL) {
+            edata = edata->prev_execute_data;
+        }
+#endif
+
         // Retrieves call lineno
-        if(edata->opline && n->filename) {
+        if (edata->opline && n->filename) {
             n->lineno = edata->opline->lineno;
+        } else if (edata && edata->prev_execute_data && edata->prev_execute_data->opline) {
+            n->lineno = edata->prev_execute_data->opline->lineno; /* try using prev */
+        } else if (op_array && op_array->opcodes) {
+            n->lineno = op_array->opcodes->lineno;
+        } else {
+            n->lineno = 0;
         }
 
         // Collects params
-        if(n->caption) {
-
-#if PHP_VERSION_ID >= 50500
-        /*
-            if(zend_vm_stack_get_args_count(TSRMLS_C) > 0) {
-                char c[4];
-                zval **arg;
-                const char *nums = "123456789";
-                char *result = NULL;
-                char delims[] = "#";
-                char *to;
-                char *val;
-                result = strtok( strdup(n->caption), delims );
-                while( result != NULL ) {
-                    if (strchr(nums, result[0])) {
-                        to = strndup(result, 1);
-                        arg = zend_vm_stack_get_arg(atoi(to) TSRMLS_CC);
-                        sprintf(c, "#%d", atoi(to));
-                        switch(Z_TYPE_PP(arg)) {
-                            case IS_DOUBLE: case IS_LONG: case IS_BOOL:
-                            case IS_NULL: case IS_STRING:
-                                convert_to_string(*arg);
-                                val = Z_STRVAL_P(arg);
-                                break;
-                            case IS_RESOURCE:
-                                val = "Resource";
-                                break;
-                            case IS_OBJECT:
-                                val = "Object";
-                                break;
-                            case IS_ARRAY:
-                                val = "Array";
-                                break;
-                            default:
-                                val = "";
-                        }
-                        n->caption = forp_str_replace(
-                            c, val,
-                            n->caption TSRMLS_CC
-                        );
-                    }
-                    result = strtok( NULL, delims );
-                }
-            }
-        */
-#else
-            void **params;
-            int params_count;
-            int i;
-
-            // Retrieves params in zend_vm_stack
-#if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION > 2)
-            params = EG(argument_stack)->top-1;
-#else
-            params = EG(argument_stack).top_element-1;
-#endif
-
-            params_count = (ulong) *params;
-            for(i = 1; i <= params_count; i++) {
-                char c[4];
-                char *v, *v_copy;
-                zval *expr;
-                zval expr_copy;
-                int use_copy;
-
-                sprintf(c, "#%d", params_count - i + 1);
-                expr = *((zval **) (params - i));
-
-                if(Z_TYPE_P(expr) == IS_OBJECT) {
-                    // Object or Closure
-                    // Closure throws a Recoverable Fatal in zend_make_printable_zval
-                    v_copy = malloc(sizeof(char*) * (strlen(Z_OBJCE_P(expr)->name) + 2));
-                    sprintf(v_copy, "(%s)", Z_OBJCE_P(expr)->name);
-                    v = strdup(v_copy);
-                    free(v_copy);
-                } else {
-                    // Uses zend_make_printable_zval
-                    zend_make_printable_zval(expr, &expr_copy, &use_copy);
-                    if(use_copy) {
-                        v = strdup((char*)(expr_copy).value.str.val);
-                        zval_dtor(&expr_copy);
-                    } else {
-                        v = strdup((char*)(*expr).value.str.val);
-                    }
-                }
-                n->caption = forp_str_replace(
-                    c, v,
-                    n->caption TSRMLS_CC
-                );
-            }
-#endif
+        if (n->caption) {
+            n->caption = getArgumentStack(edata, n);
         }
     } else {
         // Root node
@@ -296,9 +331,14 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
         n->function.class = NULL;
         n->function.function = "{main}";
 
-        if(
-            op_array && op_array->filename
-        ) {
+        if (edata->func && ZEND_USER_CODE(edata->func->common.type)) {
+            op_array = &(edata->func->op_array);
+        } else if (edata->prev_execute_data && edata->prev_execute_data->func &&
+             ZEND_USER_CODE(edata->prev_execute_data->func->common.type)) {
+            op_array = &(edata->prev_execute_data->func->op_array); /* try using prev */
+        }
+
+        if (op_array && op_array->filename) {
             n->function.filename = strdup(ZSTR_VAL(op_array->filename));
             n->filename = strdup(n->function.filename);
         } else {
@@ -312,21 +352,21 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
     n->key = key;
 
     // realloc stack * FORP_STACK_REALLOC
-    if(FORP_G(stack_len)%FORP_STACK_REALLOC == 0) {
+    if (FORP_G(stack_len) % FORP_STACK_REALLOC == 0) {
         FORP_G(stack) = realloc(
             FORP_G(stack),
-            ((FORP_G(stack_len)/FORP_STACK_REALLOC)+1) * FORP_STACK_REALLOC * sizeof (forp_node_t)
+            ((FORP_G(stack_len)/FORP_STACK_REALLOC)+1) * FORP_STACK_REALLOC * sizeof(forp_node_t)
         );
     }
 
     FORP_G(stack_len)++;
     FORP_G(stack)[key] = n;
 
-    if(FORP_G(flags) & FORP_FLAG_MEMORY) {
+    if (FORP_G(flags) & FORP_FLAG_MEMORY) {
         n->mem_begin = zend_memory_usage(0 TSRMLS_CC);
     }
 
-    if(FORP_G(flags) & FORP_FLAG_TIME) {
+    if (FORP_G(flags) & FORP_FLAG_TIME) {
         gettimeofday(&tv, NULL);
         n->time_begin = tv.tv_sec * 1000000.0 + tv.tv_usec;
         n->profiler_duration = n->time_begin - start_time;
@@ -352,7 +392,7 @@ void forp_close_node(forp_node_t *n TSRMLS_DC) {
         n->time = n->time_end - n->time_begin;
     }
 
-    if(FORP_G(flags) & FORP_FLAG_MEMORY) {
+    if (FORP_G(flags) & FORP_FLAG_MEMORY) {
         n->mem_end = zend_memory_usage(0 TSRMLS_CC);
         n->mem = n->mem_end - n->mem_begin;
     }
@@ -372,149 +412,6 @@ void forp_close_node(forp_node_t *n TSRMLS_DC) {
 }
 /* }}} */
 
-/* {{{ forp_start
- */
-void forp_start(TSRMLS_D) {
-    if(FORP_G(started)) {
-        php_error_docref(
-            NULL TSRMLS_CC,
-            E_NOTICE,
-            "forp is already started."
-            );
-    } else {
-        FORP_G(started) = 1;
-
-#if HAVE_SYS_RESOURCE_H
-        if(FORP_G(flags) & FORP_FLAG_CPU) {
-            struct rusage ru;
-            getrusage(RUSAGE_SELF, &ru);
-            FORP_G(utime) = ru.ru_utime.tv_sec * 1000000.0 + ru.ru_utime.tv_usec;
-            FORP_G(stime) = ru.ru_stime.tv_sec * 1000000.0 + ru.ru_stime.tv_usec;
-        }
-#endif
-
-        // Proxying zend api methods
-#if PHP_VERSION_ID < 50500
-        old_execute = zend_execute;
-        zend_execute = forp_execute;
-#else
-        old_execute_ex = zend_execute_ex;
-        zend_execute_ex = forp_execute_ex;
-#endif
-        if (!FORP_G(no_internals)) {
-            old_execute_internal = zend_execute_internal;
-            zend_execute_internal = forp_execute_internal;
-        }
-        FORP_G(main) = forp_open_node(NULL, NULL TSRMLS_CC);
-    }
-}
-/* }}} */
-
-/* {{{ forp_end
- */
-void forp_end(TSRMLS_D) {
-
-    if(FORP_G(started)) {
-
-#if HAVE_SYS_RESOURCE_H
-        if(FORP_G(flags) & FORP_FLAG_CPU) {
-            struct rusage ru;
-            getrusage(RUSAGE_SELF, &ru);
-            FORP_G(utime) = (ru.ru_utime.tv_sec * 1000000.0 + ru.ru_utime.tv_usec) - FORP_G(utime);
-            FORP_G(stime) = (ru.ru_stime.tv_sec * 1000000.0 + ru.ru_stime.tv_usec) - FORP_G(stime);
-        }
-#endif
-
-        // Closing ancestors
-        while(FORP_G(current_node)) {
-            forp_close_node(FORP_G(current_node) TSRMLS_CC);
-        }
-
-        // Restores Zend API methods
-#if PHP_VERSION_ID < 50500
-        if (old_execute) {
-            zend_execute = old_execute;
-            old_execute = 0;
-        }
-#else
-        if (old_execute_ex) {
-            zend_execute_ex = old_execute_ex;
-            old_execute_ex = 0;
-        }
-#endif
-        if (!FORP_G(no_internals)) {
-            zend_execute_internal = old_execute_internal;
-        }
-        // Stop
-        FORP_G(started) = 0;
-    }
-}
-/* }}} */
-
-/* {{{ forp_execute
- */
-#if PHP_VERSION_ID < 50500
-void forp_execute(zend_op_array *op_array TSRMLS_DC) {
-#else
-void forp_execute_ex(zend_execute_data *execute_data TSRMLS_DC) {
-#endif
-    forp_node_t *n;
-
-    if (FORP_G(nesting_level) > FORP_G(max_nesting_level)) {
-#if PHP_VERSION_ID < 50500
-        old_execute(op_array TSRMLS_CC);
-#else
-        old_execute_ex(execute_data TSRMLS_CC);
-#endif
-    } else {
-#if PHP_VERSION_ID < 50500
-        n = forp_open_node(EG(current_execute_data), op_array TSRMLS_CC);
-        old_execute(op_array TSRMLS_CC);
-#else
-        n = forp_open_node(EG(current_execute_data)->prev_execute_data, NULL TSRMLS_CC);
-        old_execute_ex(execute_data TSRMLS_CC);
-#endif
-
-        if(n && n->state < 2) forp_close_node(n TSRMLS_CC);
-    }
-}
-/* }}} */
-
-/* {{{ forp_execute_internal
- */
-#if PHP_VERSION_ID < 50500
-void forp_execute_internal(zend_execute_data *current_execute_data, int ret TSRMLS_DC)
-#else
-void forp_execute_internal(zend_execute_data *execute_data, zval *ret)
-#endif
-{
-    forp_node_t *n;
-
-    if (FORP_G(nesting_level) > FORP_G(max_nesting_level)) {
-#if PHP_VERSION_ID < 50500
-        execute_internal(current_execute_data, ret TSRMLS_CC);
-#else
-        execute_internal(execute_data, ret TSRMLS_CC);
-#endif
-    } else {
-        n = forp_open_node(EG(current_execute_data), NULL TSRMLS_CC);
-        if (old_execute_internal) {
-#if PHP_VERSION_ID < 50500
-            old_execute_internal(current_execute_data, ret TSRMLS_CC);
-#else
-            old_execute_internal(execute_data, ret TSRMLS_CC);
-#endif
-        } else {
-#if PHP_VERSION_ID < 50500
-            execute_internal(current_execute_data, ret TSRMLS_CC);
-#else
-            execute_internal(execute_data, ret TSRMLS_CC);
-#endif
-        }
-        if(n && n->state < 2) forp_close_node(n TSRMLS_CC);
-    }
-}
-/* }}} */
 
 /* {{{ forp_stack_dump_var
  */
@@ -648,6 +545,7 @@ void forp_stack_dump(TSRMLS_D) {
 }
 /* }}} */
 
+
 /* {{{ forp_stack_dump_cli_node
  */
 void forp_stack_dump_cli_node(forp_node_t *n TSRMLS_DC) {
@@ -738,4 +636,3 @@ int forp_is_profiling_function(forp_node_t *n TSRMLS_DC) {
         || strstr(n->function.function, "forp_json_google_tracer")
     );
 }
-/* }}} */
