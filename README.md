@@ -1,20 +1,20 @@
 # Introduction #
 
-forp is a lightweight PHP extension which provides PHP profile datas.
+forp是一个轻量级的PHP扩展提供PHP配置文件数据.
 
-Summary of features :
+总结的特性 :
 - PHP7编译时要使用(--enable-dtrace)
 - PHP7使用时需要设置环境变量(export USE_ZEND_DTRACE=1)
-- measurement of time and allocated memory for each function
-- CPU usage
-- file and line number of the function call
-- output as Google's Trace Event format
-- caption of functions
-- grouping of functions
-- aliases of functions (useful for anonymous functions)
+- 测量的时间和每个函数分配的内存
+- CPU使用率
+- 函数调用的文件和行号
+- 输出为谷歌的跟踪事件格式
+- 标题的功能
+- 分组函数
+- 别名的功能(用于匿名函数)
 
 
-forp is non intrusive, it provides PHP annotations to do its work.
+forp是非侵入性的,它提供了PHP注释来完成工作.
 
 # Simple (almost the most complicated) example #
 
