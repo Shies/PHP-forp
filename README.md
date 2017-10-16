@@ -1,6 +1,6 @@
 # Introduction #
 
-forp是一个轻量级的PHP扩展提供PHP配置文件数据.
+PHP7-forp分析器是一个轻量级的PHP扩展提供脚本的调用堆栈,CPU和内存使用.
 
 总结的特性 :
 - PHP7编译时要使用(--enable-dtrace)
@@ -16,15 +16,15 @@ forp是一个轻量级的PHP扩展提供PHP配置文件数据.
 
 forp是非侵入性的,它提供了PHP注释来完成工作.
 
-# Simple (almost the most complicated) example #
+# 一个简单的列子 #
 
 Example :
 ```php
 <?php
-// first thing to do, enable forp profiler
+// 启用分析器
 forp_start();
 
-// here, our PHP code we want to profile
+// 这里, 我想要去分析这个函数
 function foo()
 {
     echo "Hello world !\n";
@@ -32,10 +32,10 @@ function foo()
 
 foo();
 
-// stop forp buffering
+// 停止分析器
 forp_end();
 
-// get the stack as an array
+// 获取一个堆栈数组
 $profileStack = forp_dump();
 
 print_r($profileStack);
@@ -46,28 +46,28 @@ Result :
 Hello world !
 Array
 (
-    [utime] => 0
-    [stime] => 0
+    [utime] => 125
+    [stime] => 18
     [stack] => Array
         (
             [0] => Array
                 (
-                    [file] => /home/anthony/phpsrc/php-5.3.8/ext/forp/forp.php
+                    [file] => /Users/bilibili/debug/PHP7-forp/ext/forp/examples/hello.php
                     [function] => {main}
-                    [usec] => 94
-                    [pusec] => 6
-                    [bytes] => 524
+                    [usec] => 99
+                    [pusec] => 13
+                    [bytes] => 48
                     [level] => 0
                 )
 
             [1] => Array
                 (
-                    [file] => /home/anthony/phpsrc/php-5.3.8/ext/forp/forp.php
+                    [file] => /Users/bilibili/debug/PHP7-forp/ext/forp/examples/hello.php
                     [function] => foo
-                    [lineno] => 10
-                    [usec] => 9
-                    [pusec] => 6
-                    [bytes] => 120
+                    [lineno] => 11
+                    [usec] => 42
+                    [pusec] => 0
+                    [bytes] => 48
                     [level] => 1
                     [parent] => 0
                 )
@@ -77,17 +77,17 @@ Array
 )
 ```
 
-# Example with annotations #
+# 注释的示例 #
 
 Example :
 ```php
 <?php
-// first thing to do, enable forp profiler
+// 启用分析器
 forp_start();
 
 /**
- * here, our PHP code we want to profile
- * with annotations
+ * 这里, 我想要去分析这个函数
+ * 与注释
  *
  * @ProfileGroup("Test")
  * @ProfileCaption("Foo #1")
@@ -100,10 +100,10 @@ function fooWithAnnotations($bar)
 
 echo "foo = " . fooWithAnnotations("bar") . "\n";
 
-// stop forp buffering
+// 停止分析器
 forp_end();
 
-// get the stack as an array
+// 获取一个堆栈数组
 $profileStack = forp_dump();
 
 echo "forp stack = \n";
@@ -116,34 +116,34 @@ foo = Foo bar
 forp stack =
 Array
 (
-    [utime] => 0
-    [stime] => 0
+    [utime] => 269
+    [stime] => 24
     [stack] => Array
         (
             [0] => Array
                 (
-                    [file] => /home/anthony/phpsrc/php-5.3.8/ext/forp/forp.php
+                    [file] => /Users/bilibili/debug/PHP7-forp/ext/forp/forp.php
                     [function] => {main}
-                    [usec] => 113
-                    [pusec] => 6
-                    [bytes] => 568
+                    [usec] => 247
+                    [pusec] => 15
+                    [bytes] => 48
                     [level] => 0
                 )
 
             [1] => Array
                 (
-                    [file] => /home/anthony/phpsrc/php-5.3.8/ext/forp/forp.php
+                    [file] => /Users/bilibili/debug/PHP7-forp/ext/forp/forp.php
                     [function] => foo
-                    [lineno] => 41
+                    [lineno] => 18
                     [groups] => Array
                         (
                             [0] => Test
                         )
 
                     [caption] => Foo bar
-                    [usec] => 39
-                    [pusec] => 24
-                    [bytes] => 124
+                    [usec] => 28
+                    [pusec] => 145
+                    [bytes] => 80
                     [level] => 1
                     [parent] => 0
                 )
@@ -153,86 +153,86 @@ Array
 )
 ```
 
-# php.ini options #
+# php.ini 选项 #
 
-- forp.max_nesting_level : default 50
-- forp.no_internals : default 0
+- forp.max_nesting_level : 默认 50
+- forp.no_internals : 默认 0
 
 # forp PHP API #
 
-- forp_start(flags*) : start forp collector
-- forp_end() : stop forp collector
-- forp_dump() : return stack as flat array
-- forp_print() : display forp stack (SAPI CLI)
+- forp_start(flags*) : 开始forp收集器
+- forp_end() : 停止forp收集器
+- forp_dump() : 返回堆栈数组
+- forp_print() : 打印forp堆栈 (SAPI CLI)
 
-## forp_start() flags ##
+## forp_start() 标记 ##
 
-- FORP_FLAG_CPU : activate collect of time
-- FORP_FLAG_MEMORY : activate collect of memory usage
-- FORP_FLAG_CPU : retrieve the cpu usage
-- FORP_FLAG_CAPTION : enable caption handler
-- FORP_FLAG_ALIAS : enable alias handler
-- FORP_FLAG_GROUPS : enable groups handler
-- FORP_FLAG_HIGHLIGHT : enable HTML highlighting
+- FORP_FLAG_CPU : 激活收集的时间
+- FORP_FLAG_MEMORY : 激活收集的内存使用
+- FORP_FLAG_CPU : 获取cpu使用率
+- FORP_FLAG_CAPTION : 启用文字处理程序
+- FORP_FLAG_ALIAS : 启用别名处理程序
+- FORP_FLAG_GROUPS : 启用组处理程序
+- FORP_FLAG_HIGHLIGHT : 启用HTML高亮显示
 
 ## forp_dump() ##
 
-forp_dump() provides an array composed of :
+forp_dump() 提供了一个数组组成 :
 
 - global fields : utime, stime ...
-- stack : a flat PHP array of stack entries.
+- stack : PHP数组堆栈条目.
 
 Global fields :
 
-- utime : CPU used for user function calls
-- stime : CPU used for system calls
+- utime : 用户函数调用CPU使用
+- stime : 系统调用CPU使用
 
-Fields of a stack entry :
+一个堆栈条目 :
 
-- file : file of the call
-- lineno : line number of the call
-- class : Class name
-- function : function name
-- groups : list of associated groups
-- caption : caption of the function
-- usec : function time (without the profiling overhead)
-- pusec : inner profiling time (without executing the function)
-- bytes : memory usage of the function
-- level : depth level from the forp_start call
-- parent : parent index (numeric)
+- file : 文件名
+- lineno : 所在行号
+- class : 类名
+- function : 方法名
+- groups : 相关的组列表
+- caption : 标题的功能
+- usec : 函数的时间(没有剖析开销)
+- pusec : 内部分析时间(没有执行功能)
+- bytes : 内存使用情况的功能
+- level : 从forp_start调用深度水平
+- parent : 父指数(数字)
 
 ## forp_json() ##
 
-Prints stack as JSON string directly on stdout.
-This is the fastest method in order to send the stack to a JSON compatible client.
+在标准输出上直接打印堆栈为JSON字符串。
+这是最快的方法来发送JSON兼容的客户端堆栈.
 
-See forp_dump() for its structure.
+看forp_dump()它的结构.
 
 ## forp_json_google_tracer() ##
 
-forp_json_google_tracer($filepath) will output stack as Google Trace Event format.
+forp_json_google_tracer($filepath) 输出为谷歌的跟踪事件格式.
 
 Usage :
 ```php
-// Start profiler
+// 启用分析器
 forp_start();
 
 my_complex_function();
 
-// Stop profiler
+// 停止分析器
 forp_end();
 
-// Get JSON and save it into file
+// 获取json和保存它到文件里
 forp_json_google_tracer("/tmp/output.json");
 ```
-Then, open Google Chrome or Chromium browser and go to chrome://tracing/. Load the output file and enjoy the result.
+然后, 打开谷歌浏览器输入 chrome://tracing/. 载入输出文件并观看结果.
 
 ![Example output with an existing Drupal website](/docs/images/google-tracing-example_thumb.png?raw=true "Google Tracing Format example output")
 
 
 ## forp_inspect() ##
 
-forp_inspect('symbol', $symbol) will output a detailed representation of a variable in the forp_dump() result.
+forp_inspect('symbol', $symbol) 将输出一个变量的详细表示forp_dump()结果呢.
 
 Usage :
 ```php
@@ -282,11 +282,11 @@ Array
 )
 ```
 
-## Available annotations ##
+## 可用的注释 ##
 
 - @ProfileGroup
 
-Sets groups that function belongs.
+函数属于设置用户组.
 
 ```php
 /**
@@ -299,7 +299,7 @@ function exec($query) {
 
 - @ProfileCaption
 
-Adds caption to functions. Caption string may contain references (#<param num>) to parameters of the function.
+添加标题到函数。标题字符串可能包含引用(# < param num >)参数的函数.
 
 ```php
 /**
@@ -312,7 +312,7 @@ public function findByPk($pk) {
 
 - @ProfileAlias
 
-Gives an alias name to a function. Useful for anonymous functions
+给一个函数的别名。对于匿名函数
 
 ```php
 /**
@@ -325,7 +325,7 @@ $fn = function() {
 
 - @ProfileHighlight
 
-Adds a frame around output generated by the function.
+添加一个框架生成的输出函数.
 
 ```php
 /**
@@ -336,9 +336,9 @@ function render($datas) {
 }
 ```
 
-# Installation, requirements #
+# 安装必须 #
 
-## Requirements ##
+## 必须 ##
 
 php5-dev
 
@@ -346,9 +346,9 @@ php5-dev
 apt-get install php5-dev
 ```
 
-## Install with Composer ##
+## 安装composer ##
 
-Require PHP7-forp in your project composer.json
+需要在您的项目中PHP7-forp composer.json
 
 ```json
 "require-dev":       {
@@ -373,14 +373,14 @@ phpize
 ./configure
 make && make install
 ```
-and enable forp in your php.ini
+在你的php.ini里启用forp
 ```sh
 extension=forp.so
 ```
-## or opt for "old school" installation ##
+## 或选择 "old school" 安装 ##
 
 ```
-OR dev-master (unstable, at your own risk)
+OR dev-master
 ```sh
 git clone https://github.com/Shies/PHP7-forp
 cd PHP7-forp/ext/forp
@@ -392,33 +392,12 @@ phpize
 ./configure
 make && make install
 ```
-and enable forp in your php.ini
+并且在你的php.ini里启用forp
 ```sh
 extension=forp.so
 ```
 
-## Tested OS and platforms ##
-
-### Apache ###
-
-Apache/2.2.16 (Debian)
-
-PHP 5.3.8 (cli) (built: Sep 25 2012 22:55:18)
-
-### Nginx / php-fpm ###
-
-nginx version: nginx/1.2.6
-
-PHP 5.3.21-1~dotdeb.0 (fpm-fcgi)
-PHP 5.4.10-1~dotdeb.0 (fpm-fcgi)
-
-### Cloud / AWS ###
-
-Centos 6.3 (AMI)
-
-Apache/2.2.15 (Unix)
-
-PHP 5.4.13 (cli) (built: Mar 15 2013 11:27:51)
+## 测试平台 ##
 
 ### MacOS ###
 
@@ -437,7 +416,7 @@ Nginx/1.12.0         (web)
 PHP 7.0.7            (cli) (built: May 17 2017 19:52:30)
 
 
-# Contributors #
+# 贡献者 #
 
 [Anthony Terrien](https://github.com/aterrien/),
 [Ioan Chiriac](https://github.com/ichiriac/),
