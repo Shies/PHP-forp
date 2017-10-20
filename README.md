@@ -5,18 +5,18 @@ PHP7-forp分析器是一个轻量级的PHP扩展提供脚本的调用堆栈,CPU�
 总结的特性 :
 - PHP7编译时要使用(--enable-dtrace)
 - PHP7使用时需要设置环境变量(export USE_ZEND_DTRACE=1)
-- 测量的时间和每个函数分配的内存
+- 每个函数的时间和分配内存的测量
 - CPU使用率
 - 函数调用的文件和行号
 - 输出为谷歌的跟踪事件格式
-- 标题的功能
+- 字幕功能
 - 分组函数
-- 别名的功能(用于匿名函数)
+- 函数别名（对匿名函数有用）
 
 
 forp是非侵入性的,它提供了PHP注释来完成工作.
 
-# 一个简单的列子 #
+# 简单例子 #
 
 Example :
 ```php
@@ -77,7 +77,7 @@ Array
 )
 ```
 
-# 注释的示例 #
+# 例如与注释 #
 
 Example :
 ```php
@@ -86,8 +86,8 @@ Example :
 forp_start();
 
 /**
- * 这里, 我想要去分析这个函数
- * 与注释
+ * 这里，我们要介绍的PHP代码
+ * 注释
  *
  * @ProfileGroup("Test")
  * @ProfileCaption("Foo #1")
@@ -162,13 +162,13 @@ Array
 
 - forp_start(flags*) : 开始forp收集器
 - forp_end() : 停止forp收集器
-- forp_dump() : 返回堆栈数组
-- forp_print() : 打印forp堆栈 (SAPI CLI)
+- forp_dump() : 返回堆栈为平面数组
+- forp_print() : 显示forp栈 (SAPI CLI)
 
 ## forp_start() 标记 ##
 
-- FORP_FLAG_CPU : 激活收集的时间
-- FORP_FLAG_MEMORY : 激活收集的内存使用
+- FORP_FLAG_CPU : 激活时间收集
+- FORP_FLAG_MEMORY : 激活内存使用的收集
 - FORP_FLAG_CPU : 获取cpu使用率
 - FORP_FLAG_CAPTION : 启用文字处理程序
 - FORP_FLAG_ALIAS : 启用别名处理程序
@@ -180,7 +180,7 @@ Array
 forp_dump() 提供了一个数组组成 :
 
 - global fields : utime, stime ...
-- stack : PHP数组堆栈条目.
+- stack : 一个扁平的堆栈条目PHP数组.
 
 Global fields :
 
@@ -193,8 +193,8 @@ Global fields :
 - lineno : 所在行号
 - class : 类名
 - function : 方法名
-- groups : 相关的组列表
-- caption : 标题的功能
+- groups : 关联组列表
+- caption : 函数的说明
 - usec : 函数的时间(没有剖析开销)
 - pusec : 内部分析时间(没有执行功能)
 - bytes : 内存使用情况的功能
@@ -222,7 +222,7 @@ my_complex_function();
 // 停止分析器
 forp_end();
 
-// 获取json和保存它到文件里
+// 获取Json和保存它到文件里
 forp_json_google_tracer("/tmp/output.json");
 ```
 然后, 打开谷歌浏览器输入 chrome://tracing/. 载入输出文件并观看结果.
@@ -232,7 +232,7 @@ forp_json_google_tracer("/tmp/output.json");
 
 ## forp_inspect() ##
 
-forp_inspect('symbol', $symbol) 将输出一个变量的详细表示forp_dump()结果呢.
+forp_inspect('symbol', $symbol) 将输出的详细表示在forp_dump()结果变量.
 
 Usage :
 ```php
@@ -286,7 +286,7 @@ Array
 
 - @ProfileGroup
 
-函数属于设置用户组.
+设置属于函数的组.
 
 ```php
 /**
@@ -299,7 +299,7 @@ function exec($query) {
 
 - @ProfileCaption
 
-添加标题到函数。标题字符串可能包含引用(# < param num >)参数的函数.
+向函数添加说明。标题字符串可能包含引用(# < param num >)的功能参数.
 
 ```php
 /**
@@ -312,7 +312,7 @@ public function findByPk($pk) {
 
 - @ProfileAlias
 
-给一个函数的别名。对于匿名函数
+给函数赋予别名。对匿名函数有用
 
 ```php
 /**
@@ -325,7 +325,7 @@ $fn = function() {
 
 - @ProfileHighlight
 
-添加一个框架生成的输出函数.
+在函数生成的输出周围添加一个框架.
 
 ```php
 /**
@@ -336,9 +336,9 @@ function render($datas) {
 }
 ```
 
-# 安装必须 #
+# 安装要求 #
 
-## 必须 ##
+## 要求 ##
 
 php5-dev
 
@@ -348,7 +348,7 @@ apt-get install php5-dev
 
 ## 安装composer ##
 
-需要在您的项目中PHP7-forp composer.json
+要求必须在项目composer.json PHP分析器
 
 ```json
 "require-dev":       {
@@ -377,7 +377,7 @@ make && make install
 ```sh
 extension=forp.so
 ```
-## 或选择 "old school" 安装 ##
+## 或选择"老式的"安装 ##
 
 ```
 OR dev-master
