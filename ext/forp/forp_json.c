@@ -271,12 +271,12 @@ void forp_json_google_tracer(const char *filepath TSRMLS_DC) {
                         "\"%s\":\"%s::%s\",",
                         "name",
                         forp_str_replace(nssep,enssep,n->function.class TSRMLS_CC),
-                        n->function.function
+                        forp_str_replace(nssep,enssep,n->function.function)
                         );
                     }
                 else {
                     // simple function
-                    fprintf(fp,"\"%s\":\"%s\",", "name", n->function.function);
+                    fprintf(fp,"\"%s\":\"%s\",", "name", forp_str_replace(nssep,enssep,n->function.function));
                     }
             }
 
