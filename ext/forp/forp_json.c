@@ -85,7 +85,7 @@ void forp_json(TSRMLS_D) {
         forp_end(TSRMLS_C);
     }
 
-    if(FORP_G(stack_len)) {
+    if (FORP_G(stack_len)) {
 
         php_printf("{");
         php_printf("\"utime\":%0.0f,", FORP_G(utime));
@@ -100,18 +100,18 @@ void forp_json(TSRMLS_D) {
 
             if (n->filename) {
                 php_printf(
-                        "\"%s\":\"%s\",",
-                        FORP_DUMP_ASSOC_FILE,
-                        forp_str_replace(psep,epsep,n->function.filename TSRMLS_CC)
-                        );
+                    "\"%s\":\"%s\",",
+                    FORP_DUMP_ASSOC_FILE,
+                    forp_str_replace(psep,epsep,n->function.filename TSRMLS_CC)
+                );
             }
 
             if (n->function.class) {
                 php_printf(
-                        "\"%s\":\"%s\",",
-                        FORP_DUMP_ASSOC_CLASS,
-                        forp_str_replace(nssep,enssep,n->function.class TSRMLS_CC)
-                        );
+                    "\"%s\":\"%s\",",
+                    FORP_DUMP_ASSOC_CLASS,
+                    forp_str_replace(nssep,enssep,n->function.class TSRMLS_CC)
+                );
             }
 
             if (n->alias) {
@@ -126,9 +126,9 @@ void forp_json(TSRMLS_D) {
             if (n->function.groups && n->function.groups_len > 0) {
                 j = 0;
                 php_printf("\"%s\":[", FORP_DUMP_ASSOC_GROUPS);
-                while(j < n->function.groups_len) {
+                while (j < n->function.groups_len) {
                     php_printf("\"%s\"", n->function.groups[j]);
-                    if(j < n->function.groups_len - 1)
+                    if (j < n->function.groups_len - 1)
                         php_printf(",");
                     j++;
                 }
@@ -140,12 +140,12 @@ void forp_json(TSRMLS_D) {
                 php_printf("\"%s\":\"%s\",", FORP_DUMP_ASSOC_CAPTION, n->caption);
             }
 
-            if(FORP_G(flags) & FORP_FLAG_TIME) {
+            if (FORP_G(flags) & FORP_FLAG_TIME) {
                 php_printf("\"%s\":%0.0f,", FORP_DUMP_ASSOC_DURATION, round(n->time * 1000000.0) / 1000000.0);
                 php_printf("\"%s\":%0.0f,", FORP_DUMP_ASSOC_PROFILERTIME, round(n->profiler_duration * 1000000.0) / 1000000.0);
             }
 
-            if(FORP_G(flags) & FORP_FLAG_MEMORY) {
+            if (FORP_G(flags) & FORP_FLAG_MEMORY) {
                 php_printf("\"%s\":%ld,", FORP_DUMP_ASSOC_MEMORY, n->mem);
             }
 
@@ -158,23 +158,24 @@ void forp_json(TSRMLS_D) {
 
             php_printf("}");
 
-            if(i < FORP_G(stack_len) - 1) php_printf(",");
+            if (i < FORP_G(stack_len) - 1) php_printf(",");
         }
-				if(FORP_G(inspect_len)) {
-						php_printf("],\"inspect\":{");
-						for (i = 0; i < FORP_G(inspect_len); i++) {
-								php_printf("\"%s\": {",FORP_G(inspect)[i]->name);
-								forp_json_inspect(FORP_G(inspect)[i] TSRMLS_CC);
-								if ( i + 1 < FORP_G(inspect_len) )  {
-										php_printf("},");
-								} else {
-										php_printf("}");
-								}
-						}
-						php_printf("}}");
-				} else {
-						php_printf("]}");
-				}
+
+        if (FORP_G(inspect_len)) {
+            php_printf("],\"inspect\":{");
+            for (i = 0; i < FORP_G(inspect_len); i++) {
+                php_printf("\"%s\": {",FORP_G(inspect)[i]->name);
+                forp_json_inspect(FORP_G(inspect)[i] TSRMLS_CC);
+                if (i + 1 < FORP_G(inspect_len))  {
+                    php_printf("},");
+                } else {
+                    php_printf("}");
+                }
+            }
+            php_printf("}}");
+        } else {
+            php_printf("]}");
+        }
     }
 }
 
@@ -182,34 +183,35 @@ void forp_json(TSRMLS_D) {
  * Recursive output inspect structure
  */
 void forp_json_inspect(forp_var_t *var TSRMLS_DC) {
-		uint i;
-		if(var->stack_idx > -1) php_printf("\"stack_idx\":%d,", var->stack_idx);
-    if(var->type) php_printf("\"type\":\"%s\",", var->type);
-    if(var->level) php_printf("\"level\":\"%s\",", var->level);
-		if(var->class) php_printf("\"class\":\"%s\",", var->class);
-		if(var->is_ref) {
+	uint i;
+	if (var->stack_idx > -1) php_printf("\"stack_idx\":%d,", var->stack_idx);
+    if (var->type) php_printf("\"type\":\"%s\",", var->type);
+    if (var->level) php_printf("\"level\":\"%s\",", var->level);
+	if (var->class) php_printf("\"class\":\"%s\",", var->class);
+	if (var->is_ref) {
         php_printf("\"is_ref\": true,");
-        if(var->refcount > 1) php_printf("\"refcount\":%d,", var->refcount);
+        if (var->refcount > 1) php_printf("\"refcount\":%d,", var->refcount);
     }
-		if(var->arr_len) {
-				if(strcmp(var->type, "object") == 0) {
-						php_printf("\"properties\":{");
-				} else {
-						php_printf("\"value\":{");
-				}
-				for(i = 0; i < var->arr_len; i++) {
-						php_printf("\"%s\": {", forp_addslashes(var->arr[i]->key TSRMLS_CC));
-            forp_json_inspect(var->arr[i] TSRMLS_CC);
-						if ( i + 1 < var->arr_len ) {
-								php_printf("},");
-						} else {
-								php_printf("}");
-						}
-        }
-				php_printf("}");
+
+	if (var->arr_len) {
+		if (strcmp(var->type, "object") == 0) {
+            php_printf("\"properties\":{");
 		} else {
-				php_printf("\"value\":\"%s\"", forp_addslashes(var->value TSRMLS_CC));
+            php_printf("\"value\":{");
 		}
+	    for (i = 0; i < var->arr_len; i++) {
+			php_printf("\"%s\": {", forp_addslashes(var->arr[i]->key TSRMLS_CC));
+            forp_json_inspect(var->arr[i] TSRMLS_CC);
+            if (i + 1 < var->arr_len) {
+                php_printf("},");
+            } else {
+                php_printf("}");
+            }
+        }
+	    php_printf("}");
+    } else {
+        php_printf("\"value\":\"%s\"", forp_addslashes(var->value TSRMLS_CC));
+    }
 }
 
 /* {{{ forp_json_google_tracer
@@ -243,7 +245,7 @@ void forp_json_google_tracer(const char *filepath TSRMLS_DC) {
         forp_end(TSRMLS_C);
     }
 
-    if(FORP_G(stack_len)) {
+    if (FORP_G(stack_len)) {
         // First, delete existing file
         unlink(filepath);
         // Then, open and append everything
@@ -264,7 +266,7 @@ void forp_json_google_tracer(const char *filepath TSRMLS_DC) {
 
             if (n->alias) {
                 fprintf(fp,"\"%s\":\"%s\",", "name", n->alias);
-                } else if (n->function.function) {
+            } else if (n->function.function) {
                 if (n->function.class) {
                     // class and method
                     fprintf(fp,
@@ -272,40 +274,38 @@ void forp_json_google_tracer(const char *filepath TSRMLS_DC) {
                         "name",
                         forp_str_replace(nssep,enssep,n->function.class TSRMLS_CC),
                         forp_str_replace(nssep,enssep,n->function.function)
-                        );
-                    }
-                else {
+                    );
+                } else {
                     // simple function
                     fprintf(fp,"\"%s\":\"%s\",", "name", forp_str_replace(nssep,enssep,n->function.function));
-                    }
+                }
             }
 
             if (n->function.groups && n->function.groups_len > 0) {
                 j = 0;
                 fprintf(fp,"\"%s\":\"", "cat");
-                while(j < n->function.groups_len) {
+                while (j < n->function.groups_len) {
                     fprintf(fp,"%s", n->function.groups[j]);
-                    if(j < n->function.groups_len - 1){
+                    if (j < n->function.groups_len - 1){
                         fprintf(fp,",");
-                        }
+                    }
                     j++;
                 }
                 fprintf(fp,"\",");
-                }
-            else {
+            } else {
                 fprintf(fp,"\"%s\":\"%s\",", "cat", "PHP");
-                }
+            }
 
-            if(FORP_G(flags) & FORP_FLAG_TIME) {
+            if (FORP_G(flags) & FORP_FLAG_TIME) {
                 fprintf(fp,"\"%s\":%0.0f,", "dur", round(n->time * 1000000.0) / 1000000.0);
                 fprintf(fp,"\"%s\":%0.0f", "ts", n->time_begin);
                 // fprintf(fp,"\"%s\":%0.0f,", FORP_DUMP_ASSOC_PROFILERTIME, round(n->profiler_duration * 1000000.0) / 1000000.0);
             }
 
             fprintf(fp,"}");
-            if(i < FORP_G(stack_len) - 1) {
+            if (i < FORP_G(stack_len) - 1) {
                 fprintf(fp,",");
-                }
+            }
         }
 
         fprintf(fp,"]}");

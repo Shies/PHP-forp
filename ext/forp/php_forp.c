@@ -23,15 +23,13 @@
 
 #include "php.h"
 #include "php_ini.h"
-
-#include "forp_log.h"
-
-#include "forp.h"
-#include "php_forp.h"
-
 #include "ext/standard/info.h"
 #include "zend_exceptions.h"
 #include "Zend/zend_vm.h"
+
+#include "forp_log.h"
+#include "forp.h"
+#include "php_forp.h"
 
 #if HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
@@ -78,12 +76,12 @@ ZEND_API void forp_execute_internal(zend_execute_data *current_execute_data, zva
 /* {{{ forp_start
  */
 void forp_start(TSRMLS_D) {
-    if(FORP_G(started)) {
+    if (FORP_G(started)) {
         php_error_docref(
             NULL TSRMLS_CC,
             E_NOTICE,
             "forp is already started."
-            );
+        );
     } else {
         FORP_G(started) = 1;
 
@@ -97,14 +95,8 @@ void forp_start(TSRMLS_D) {
 #endif
 
         // Proxying zend api methods
-#if PHP_VERSION_ID < 50500
-        old_execute = zend_execute;
-        zend_execute = forp_execute;
-#else
-        /*init the execute pointer*/
         ori_execute_ex = zend_execute_ex;
         zend_execute_ex = forp_execute_ex;
-#endif
 
         if (!FORP_G(no_internals)) {
             ori_execute_internal = zend_execute_internal;
@@ -120,10 +112,10 @@ void forp_start(TSRMLS_D) {
  */
 void forp_end(TSRMLS_D) {
 
-    if(FORP_G(started)) {
+    if (FORP_G(started)) {
 
 #if HAVE_SYS_RESOURCE_H
-        if(FORP_G(flags) & FORP_FLAG_CPU) {
+        if (FORP_G(flags) & FORP_FLAG_CPU) {
             struct rusage ru;
             getrusage(RUSAGE_SELF, &ru);
             FORP_G(utime) = (ru.ru_utime.tv_sec * 1000000.0 + ru.ru_utime.tv_usec) - FORP_G(utime);
@@ -137,17 +129,11 @@ void forp_end(TSRMLS_D) {
         }
 
         // Restores Zend API methods
-#if PHP_VERSION_ID < 50500
-        if (old_execute) {
-            zend_execute = old_execute;
-            old_execute = 0;
-        }
-#else
         if (ori_execute_ex) {
             zend_execute_ex = ori_execute_ex;
             ori_execute_ex = 0;
         }
-#endif
+
         if (!FORP_G(no_internals)) {
             zend_execute_internal = ori_execute_internal;
         }
@@ -310,16 +296,9 @@ PHP_RINIT_FUNCTION(forp) {
 PHP_RSHUTDOWN_FUNCTION(forp) {
     if (FORP_G(started)) {
         // Restores zend api methods
-
-#if PHP_VERSION_ID < 50500
-        if (old_execute) {
-            zend_execute = old_execute;
-        }
-#else
         if (ori_execute_ex) {
             zend_execute_ex = ori_execute_ex;
         }
-#endif
 
         if (!FORP_G(no_internals)) {
             zend_execute_internal = ori_execute_internal;

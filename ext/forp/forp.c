@@ -23,15 +23,14 @@
 
 #include "php.h"
 #include "php_ini.h"
+#include "ext/standard/php_var.h"
+#include "Zend/zend_vm.h"
 
 #include "forp.h"
 #include "php_forp.h"
 #include "forp_log.h"
-
 #include "forp_string.h"
 #include "forp_annotation.h"
-#include "ext/standard/php_var.h"
-#include "Zend/zend_vm.h"
 
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -76,11 +75,7 @@ static void forp_populate_function(
         // get this filename
         function->function = strdup(ZSTR_VAL(op_array->function_name));
     } else {
-#if PHP_VERSION_ID >= 50399
         switch (function->type = edata->opline->extended_value) {
-#else
-        switch (function->type = edata->opline->op2.u.constant.value.lval) {
-#endif
             case ZEND_EVAL:
                 function->function = "eval";
                 break;
@@ -119,96 +114,33 @@ static void forp_populate_function(
 /* }}} */
 
 
-char *getArgumentStack(zend_execute_data *edata, forp_node_t *n)
+char *gettype(zval *arg)
 {
-#if PHP_VERSION_ID >= 50500
-    if (ZEND_CALL_NUM_ARGS(edata) > 0) {
-        char c[4];
-        zval *arg;
-        const char *nums = "123456789";
-        char *result = NULL;
-        char delims[] = "#";
-        char *to;
-        char *val;
-        result = strtok( strdup(n->caption), delims );
-        while( result != NULL ) {
-            if (strchr(nums, result[0])) {
-                to = strndup(result, 1);
-                arg = ZEND_CALL_ARG(edata, (edata->func->op_array).num_args);
-                sprintf(c, "#%d", atoi(to));
-                switch(Z_TYPE_P(arg)) {
-                    case IS_DOUBLE: case IS_LONG: case IS_TRUE:
-                    case IS_FALSE: case IS_NULL: case IS_STRING:
-                        convert_to_string(arg);
-                        val = Z_STRVAL_P(arg);
-                        break;
-                    case IS_RESOURCE:
-                        val = "Resource";
-                        break;
-                    case IS_OBJECT:
-                        val = "Object";
-                        break;
-                    case IS_ARRAY:
-                        val = "Array";
-                        break;
-                    default:
-                        val = "";
-                }
-                n->caption = forp_str_replace(
-                    c, val,
-                    n->caption TSRMLS_CC
-                );
-            }
-            result = strtok( NULL, delims );
-        }
+    char *val;
+    switch (Z_TYPE_P(arg)) {
+        case IS_DOUBLE: case IS_LONG: case IS_TRUE:
+        case IS_FALSE: case IS_NULL: case IS_STRING:
+            convert_to_string(arg);
+            val = Z_STRVAL_P(arg);
+            break;
+        case IS_RESOURCE:
+            val = "Resource";
+            break;
+        case IS_OBJECT:
+            val = "Object";
+            break;
+        case IS_ARRAY:
+            val = "Array";
+            break;
+        default:
+            val = "";
     }
-#else
-    void **params;
-    int params_count;
-    int i;
 
-    // Retrieves params in zend_vm_stack
-#if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION > 2)
-    params = EG(argument_stack)->top-1;
-#else
-    params = EG(argument_stack).top_element-1;
-#endif
+    return val;
+}
 
-    params_count = (ulong) *params;
-    for(i = 1; i <= params_count; i++) {
-        char c[4];
-        char *v, *v_copy;
-        zval *expr;
-        zval expr_copy;
-        int use_copy;
-
-        sprintf(c, "#%d", params_count - i + 1);
-        expr = *((zval **) (params - i));
-
-        if(Z_TYPE_P(expr) == IS_OBJECT) {
-            // Object or Closure
-            // Closure throws a Recoverable Fatal in zend_make_printable_zval
-            v_copy = malloc(sizeof(char*) * (strlen(Z_OBJCE_P(expr)->name) + 2));
-            sprintf(v_copy, "(%s)", Z_OBJCE_P(expr)->name);
-            v = strdup(v_copy);
-            free(v_copy);
-        } else {
-            // Uses zend_make_printable_zval
-            zend_make_printable_zval(expr, &expr_copy, &use_copy);
-            if(use_copy) {
-                v = strdup((char*)(expr_copy).value.str.val);
-                zval_dtor(&expr_copy);
-            } else {
-                v = strdup((char*)(*expr).value.str.val);
-            }
-        }
-        n->caption = forp_str_replace(
-            c, v,
-            n->caption TSRMLS_CC
-        );
-    }
-#endif
-
+char *caption_stack(zend_execute_data *edata, forp_node_t *n)
+{
     return n->caption;
 }
 
@@ -291,7 +223,6 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
             n->filename = strdup(FORP_G(current_node)->function.filename);
         }
 
-#if PHP_VERSION_ID >= 70000
         /* FIXME Sometimes execute_data->opline can be a interger NOT pointer.
          * I dont know how to handle it, this just make it works. */
         if (edata && edata->opline && edata->prev_execute_data &&
@@ -308,7 +239,6 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
                 edata->opline->opcode != ZEND_INCLUDE_OR_EVAL) {
             edata = edata->prev_execute_data;
         }
-#endif
 
         // Retrieves call lineno
         if (edata->opline && n->filename) {
@@ -323,7 +253,23 @@ forp_node_t *forp_open_node(zend_execute_data *edata, zend_op_array *op_array TS
 
         // Collects params
         if (n->caption) {
-            n->caption = getArgumentStack(edata, n);
+            if (ZEND_CALL_NUM_ARGS(edata) > 0) {
+                char c[4];
+                char *to, *result;
+                const char *nums = "123456789";
+                char delims[] = "#";
+                result = strtok(strdup(n->caption), delims);
+                while (result && strchr(nums, result[0])) {
+                    to = strndup(result, 1);
+                    sprintf(c, "#%d", atoi(to));
+                    n->caption = forp_str_replace(
+                        c,
+                        gettype(ZEND_CALL_ARG(edata, (edata->func->op_array).num_args)),
+                        n->caption TSRMLS_CC
+                    );
+                    result = strtok(NULL, delims);
+                }
+            }
         }
     } else {
         // Root node
@@ -405,7 +351,7 @@ void forp_close_node(forp_node_t *n TSRMLS_DC) {
     FORP_G(nesting_level)--;
 
     // self duration on exit
-    if(FORP_G(flags) & FORP_FLAG_TIME) {
+    if (FORP_G(flags) & FORP_FLAG_TIME) {
         gettimeofday(&tv, NULL);
         n->profiler_duration += (tv.tv_sec * 1000000.0 + tv.tv_usec) - n->time_end ;
     }

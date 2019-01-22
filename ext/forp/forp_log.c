@@ -23,12 +23,11 @@
 
 #include "php.h"
 #include "php_ini.h"
+#include "ext/standard/php_var.h"
 
 #include "forp.h"
 #include "php_forp.h"
-
 #include "forp_log.h"
-#include "ext/standard/php_var.h"
 
 #ifdef ZTS
 #include "TSRM.h"
