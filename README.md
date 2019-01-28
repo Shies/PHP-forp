@@ -348,26 +348,14 @@ apt-get install php5-dev
 
 ## 安装composer ##
 
-要求必须在项目composer.json PHP分析器
+需要在您的项目中引入包
 
-```json
-"require-dev":       {
-  "gukai/php7-forp" : "dev-master"
-},
-"repositories" : [
-  {
-     "type" : "git",
-     "url"  : "git@github.com:Shies/PHP7-forp.git"
-  }
-]
-```
-run Composer install
 ```sh
-php composer.phar install
+composer require gukai/php7-forp dev-master
 ```
 compile
 ```sh
-cd vendor/Shies/PHP7-forp/ext/forp
+cd vendor/gukai/php7-forp/ext/forp
 export USE_ZEND_DTRACE=1
 phpize
 ./configure
